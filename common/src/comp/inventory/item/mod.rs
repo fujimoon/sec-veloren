@@ -1,96 +1,20 @@
+pub mod armor;
+pub mod tool;
+
+// Reexports
+pub use tool::{DebugKind, SwordKind, Tool, ToolKind};
+
 use crate::{
     assets::{self, Asset},
     effect::Effect,
     terrain::{Block, BlockKind},
 };
-//use rand::prelude::*;
 use rand::seq::SliceRandom;
 use specs::{Component, FlaggedStorage};
 use specs_idvs::IDVStorage;
-use std::{fs::File, io::BufReader, time::Duration};
+use std::{fs::File, io::BufReader};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub enum Tool {
-    Sword,
-    Axe,
-    Hammer,
-    Bow,
-    Dagger,
-    Staff,
-    Shield,
-    Debug(Debug),
-}
-
-// TODO: Allow override in item ron?
-impl Tool {
-    pub fn wield_duration(&self) -> Duration {
-        match self {
-            Tool::Sword => Duration::from_millis(800),
-            Tool::Axe => Duration::from_millis(1000),
-            Tool::Hammer => Duration::from_millis(1000),
-            Tool::Bow => Duration::from_millis(800),
-            Tool::Dagger => Duration::from_millis(300),
-            Tool::Staff => Duration::from_millis(800),
-            Tool::Shield => Duration::from_millis(1000),
-            Tool::Debug(_) => Duration::from_millis(0),
-        }
-    }
-
-    pub fn attack_buildup_duration(&self) -> Duration {
-        match self {
-            Tool::Sword => Duration::from_millis(100),
-            Tool::Axe => Duration::from_millis(700),
-            Tool::Hammer => Duration::from_millis(700),
-            Tool::Bow => Duration::from_millis(0),
-            Tool::Dagger => Duration::from_millis(100),
-            Tool::Staff => Duration::from_millis(400),
-            Tool::Shield => Duration::from_millis(100),
-            Tool::Debug(_) => Duration::from_millis(0),
-        }
-    }
-
-    pub fn attack_recover_duration(&self) -> Duration {
-        match self {
-            Tool::Sword => Duration::from_millis(500),
-            Tool::Axe => Duration::from_millis(100),
-            Tool::Hammer => Duration::from_millis(100),
-            Tool::Bow => Duration::from_millis(800),
-            Tool::Dagger => Duration::from_millis(400),
-            Tool::Staff => Duration::from_millis(300),
-            Tool::Shield => Duration::from_millis(1000),
-            Tool::Debug(_) => Duration::from_millis(0),
-        }
-    }
-
-    pub fn attack_duration(&self) -> Duration {
-        self.attack_buildup_duration() + self.attack_recover_duration()
-    }
-}
-
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub enum Debug {
-    Boost,
-    Possess,
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub enum Armor {
-    // TODO: Don't make armor be a body part. Wearing enemy's head is funny but also a creepy
-    // thing to do.
-    Helmet,
-    Shoulders,
-    Chestplate,
-    Belt,
-    Gloves,
-    Pants,
-    Boots,
-    Back,
-    Tabard,
-    Gem,
-    Necklace,
-}
-
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum Consumable {
     Apple,
     Cheese,
@@ -101,24 +25,43 @@ pub enum Consumable {
     PotionMinor,
 }
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum Utility {
     Collar,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum Ingredient {
     Flower,
     Grass,
 }
 
+fn default_amount() -> u32 { 1 }
+
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum ItemKind {
-    Tool { kind: Tool, power: u32 },
-    Armor { kind: Armor, power: u32 },
-    Consumable { kind: Consumable, effect: Effect },
-    Utility { kind: Utility },
-    Ingredient(Ingredient),
+    /// Something wieldable
+    Tool(tool::Tool),
+    Armor {
+        kind: armor::Armor,
+        stats: armor::Stats,
+    },
+    Consumable {
+        kind: Consumable,
+        effect: Effect,
+        #[serde(default = "default_amount")]
+        amount: u32,
+    },
+    Utility {
+        kind: Utility,
+        #[serde(default = "default_amount")]
+        amount: u32,
+    },
+    Ingredient {
+        kind: Ingredient,
+        #[serde(default = "default_amount")]
+        amount: u32,
+    },
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -137,6 +80,16 @@ impl Asset for Item {
 }
 
 impl Item {
+    // TODO: consider alternatives such as default abilities that can be added to a
+    // loadout when no weapon is present
+    pub fn empty() -> Self {
+        Self {
+            name: "Empty Item".to_owned(),
+            description: "This item may grant abilities, but is invisible".to_owned(),
+            kind: ItemKind::Tool(Tool::empty()),
+        }
+    }
+
     pub fn name(&self) -> &str { &self.name }
 
     pub fn description(&self) -> &str { &self.description }
@@ -174,9 +127,43 @@ impl Item {
                     "common.items.collar",
                     "common.items.weapons.starter_sword",
                     "common.items.weapons.starter_axe",
+                    "common.items.weapons.staff_nature",
                     "common.items.weapons.starter_hammer",
                     "common.items.weapons.starter_bow",
                     "common.items.weapons.starter_staff",
+                    "common.items.armor.belt.plate_0",
+                    "common.items.armor.belt.leather_0",
+                    "common.items.armor.chest.plate_green_0",
+                    "common.items.armor.chest.leather_0",
+                    "common.items.armor.foot.plate_0",
+                    "common.items.armor.foot.leather_0",
+                    "common.items.armor.pants.plate_green_0",
+                    "common.items.armor.belt.leather_0",
+                    "common.items.armor.shoulder.plate_0",
+                    "common.items.armor.shoulder.leather_1",
+                    "common.items.armor.shoulder.leather_0",
+                    "common.items.armor.hand.leather_0",
+                    "common.items.armor.hand.plate_0",
+                    "common.items.weapons.wood_sword",
+                    "common.items.weapons.short_sword_0",
+                    "common.items.armor.belt.cloth_blue_0",
+                    "common.items.armor.chest.cloth_blue_0",
+                    "common.items.armor.foot.cloth_blue_0",
+                    "common.items.armor.pants.cloth_blue_0",
+                    "common.items.armor.shoulder.cloth_blue_0",
+                    "common.items.armor.hand.cloth_blue_0",
+                    "common.items.armor.belt.cloth_green_0",
+                    "common.items.armor.chest.cloth_green_0",
+                    "common.items.armor.foot.cloth_green_0",
+                    "common.items.armor.pants.cloth_green_0",
+                    "common.items.armor.shoulder.cloth_green_0",
+                    "common.items.armor.hand.cloth_green_0",
+                    "common.items.armor.belt.cloth_purple_0",
+                    "common.items.armor.chest.cloth_purple_0",
+                    "common.items.armor.foot.cloth_purple_0",
+                    "common.items.armor.pants.cloth_purple_0",
+                    "common.items.armor.shoulder.cloth_purple_0",
+                    "common.items.armor.hand.cloth_purple_0",
                 ]
                 .choose(&mut rand::thread_rng())
                 .unwrap(), // Can't fail
