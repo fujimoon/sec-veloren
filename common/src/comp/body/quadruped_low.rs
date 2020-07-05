@@ -21,21 +21,20 @@ impl Body {
 }
 
 impl From<Body> for super::Body {
-    fn from(body: Body) -> Self { super::Body::QuadrupedMedium(body) }
+    fn from(body: Body) -> Self { super::Body::QuadrupedLow(body) }
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[repr(u32)]
 pub enum Species {
-    Grolgar = 0,
-    Saber = 1,
-    Tiger = 2,
-    Tuskram = 3,
-    Lion = 6,
-    Tarasque = 7,
-    Wolf = 8,
-    Frostfang = 9,
-    Mouflon = 10,
+    Crocodile = 0,
+    Alligator = 1,
+    Salamander = 2,
+    Monitor = 3,
+    Asp = 4,
+    Tortoise = 5,
+    Rocksnapper = 6,
+    Pangolin = 7,
 }
 
 /// Data representing per-species generic data.
@@ -43,15 +42,14 @@ pub enum Species {
 /// NOTE: Deliberately don't (yet?) implement serialize.
 #[derive(Clone, Debug, Deserialize)]
 pub struct AllSpecies<SpeciesMeta> {
-    pub grolgar: SpeciesMeta,
-    pub saber: SpeciesMeta,
-    pub tiger: SpeciesMeta,
-    pub tuskram: SpeciesMeta,
-    pub lion: SpeciesMeta,
-    pub tarasque: SpeciesMeta,
-    pub wolf: SpeciesMeta,
-    pub frostfang: SpeciesMeta,
-    pub mouflon: SpeciesMeta,
+    pub crocodile: SpeciesMeta,
+    pub alligator: SpeciesMeta,
+    pub salamander: SpeciesMeta,
+    pub monitor: SpeciesMeta,
+    pub asp: SpeciesMeta,
+    pub tortoise: SpeciesMeta,
+    pub rocksnapper: SpeciesMeta,
+    pub pangolin: SpeciesMeta,
 }
 
 impl<'a, SpeciesMeta> core::ops::Index<&'a Species> for AllSpecies<SpeciesMeta> {
@@ -60,29 +58,27 @@ impl<'a, SpeciesMeta> core::ops::Index<&'a Species> for AllSpecies<SpeciesMeta> 
     #[inline]
     fn index(&self, &index: &'a Species) -> &Self::Output {
         match index {
-            Species::Grolgar => &self.grolgar,
-            Species::Saber => &self.saber,
-            Species::Tiger => &self.tiger,
-            Species::Tuskram => &self.tuskram,
-            Species::Lion => &self.lion,
-            Species::Tarasque => &self.tarasque,
-            Species::Wolf => &self.wolf,
-            Species::Frostfang => &self.frostfang,
-            Species::Mouflon => &self.mouflon,
+            Species::Crocodile => &self.crocodile,
+            Species::Alligator => &self.alligator,
+            Species::Salamander => &self.salamander,
+            Species::Monitor => &self.monitor,
+            Species::Asp => &self.asp,
+            Species::Tortoise => &self.tortoise,
+            Species::Rocksnapper => &self.rocksnapper,
+            Species::Pangolin => &self.pangolin,
         }
     }
 }
 
-pub const ALL_SPECIES: [Species; 9] = [
-    Species::Grolgar,
-    Species::Saber,
-    Species::Tiger,
-    Species::Tuskram,
-    Species::Lion,
-    Species::Tarasque,
-    Species::Wolf,
-    Species::Frostfang,
-    Species::Mouflon,
+pub const ALL_SPECIES: [Species; 8] = [
+    Species::Crocodile,
+    Species::Alligator,
+    Species::Salamander,
+    Species::Monitor,
+    Species::Asp,
+    Species::Tortoise,
+    Species::Rocksnapper,
+    Species::Pangolin,
 ];
 
 impl<'a, SpeciesMeta: 'a> IntoIterator for &'a AllSpecies<SpeciesMeta> {
