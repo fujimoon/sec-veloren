@@ -1,12 +1,13 @@
 ItemDef(
-    name: "Velorite Gloves",
+    name: "Velorite Battlemage Gauntlets",
     description: "",
     kind: Armor(
         (
             kind: Hand("VeloriteMage0"),
             stats: (
-                protection: Invincible),            
+                protection: Normal(11.5)
+                ),            
         )
     ),
-    quality: Debug,
+    quality: High,
 )

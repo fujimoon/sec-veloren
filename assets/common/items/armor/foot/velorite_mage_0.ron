@@ -1,12 +1,13 @@
 ItemDef(
-    name: "Velorite Boots",
+    name: "Velorite Battlemage Boots",
     description: "",
     kind: Armor(
         (
             kind: Foot("VeloriteMage0"),
             stats: (
-                protection: Invincible),            
+                protection: Normal(5.9)
+                ),            
         )
     ),
-    quality: Debug,
+    quality: High,
 )

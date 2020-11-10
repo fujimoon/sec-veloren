@@ -1,12 +1,13 @@
 ItemDef(
-    name: "Velorite Skirt",
+    name: "Velorite Battlemage Kilt",
     description: "",
     kind: Armor(
         (
             kind: Pants("VeloriteMage0"),
             stats: (
-                protection: Invincible),            
+                protection: Normal(23.0)
+                ),            
         )
     ),
-    quality: Debug,
+    quality: High,
 )

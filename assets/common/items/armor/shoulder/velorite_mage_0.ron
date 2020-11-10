@@ -1,12 +1,13 @@
 ItemDef(
-    name: "Velorite Mantle",
+    name: "Velorite Battlemage Guards",
     description: "",
     kind: Armor(
         (
             kind: Shoulder("VeloriteMage0"),
             stats: (
-                protection: Invincible),            
+                protection: Normal(17.0)
+                ),            
         )
     ),
-    quality: Debug,
+    quality: High,
 )
