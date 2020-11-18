@@ -1,5 +1,4 @@
-/// EventMapper::Combat watches the combat states of surrounding entities' and
-/// emits sfx related to weapons and attacks/abilities
+/// EventMapper::Campfire maps sfx to campfires
 use crate::{
     audio::sfx::{SfxEvent, SfxTriggerItem, SfxTriggers, SFX_DIST_LIMIT_SQR},
     scene::{Camera, Terrain},
@@ -10,7 +9,7 @@ use super::EventMapper;
 
 use client::Client;
 use common::{
-    comp::{item::ItemKind, CharacterAbilityType, CharacterState, Loadout, Pos},
+    comp::{object, Body, Pos},
     state::State,
     terrain::TerrainChunk,
     vol::ReadVol,
@@ -23,7 +22,6 @@ use std::time::{Duration, Instant};
 struct PreviousEntityState {
     event: SfxEvent,
     time: Instant,
-    weapon_drawn: bool,
 }
 
 impl Default for PreviousEntityState {
@@ -31,16 +29,15 @@ impl Default for PreviousEntityState {
         Self {
             event: SfxEvent::Idle,
             time: Instant::now(),
-            weapon_drawn: false,
         }
     }
 }
 
-pub struct CombatEventMapper {
+pub struct CampfireEventMapper {
     event_history: HashMap<EcsEntity, PreviousEntityState>,
 }
 
-impl EventMapper for CombatEventMapper {
+impl EventMapper for CampfireEventMapper {
     fn maintain(
         &mut self,
         audio: &mut AudioFrontend,
@@ -52,49 +49,43 @@ impl EventMapper for CombatEventMapper {
         _client: &Client,
     ) {
         let ecs = state.ecs();
-
         let focus_off = camera.get_focus_pos().map(f32::trunc);
         let cam_pos = camera.dependents().cam_pos + focus_off;
-
-        for (entity, pos, loadout, character) in (
+        for (entity, body, pos) in (
             &ecs.entities(),
+            &ecs.read_storage::<Body>(),
             &ecs.read_storage::<Pos>(),
-            ecs.read_storage::<Loadout>().maybe(),
-            ecs.read_storage::<CharacterState>().maybe(),
         )
             .join()
-            .filter(|(_, e_pos, ..)| (e_pos.0.distance_squared(cam_pos)) < SFX_DIST_LIMIT_SQR)
+            .filter(|(_, _, e_pos)| (e_pos.0.distance_squared(cam_pos)) < SFX_DIST_LIMIT_SQR)
         {
-            if let Some(character) = character {
-                let sfx_state = self.event_history.entry(entity).or_default();
+            if let Body::Object(object::Body::CampfireLit) = body {
+                let internal_state = self.event_history.entry(entity).or_default();
 
-                let mapped_event = Self::map_event(character, sfx_state, loadout);
+                let mapped_event = SfxEvent::Campfire;
 
                 // Check for SFX config entry for this movement
-                if Self::should_emit(sfx_state, triggers.get_key_value(&mapped_event)) {
+                if Self::should_emit(internal_state, triggers.get_key_value(&mapped_event)) {
                     let underwater = state
                         .terrain()
                         .get(cam_pos.map(|e| e.floor() as i32))
                         .map(|b| b.is_liquid())
                         .unwrap_or(false);
-
                     let sfx_trigger_item = triggers.get_key_value(&mapped_event);
                     audio.emit_sfx(sfx_trigger_item, pos.0, None, underwater);
-                    sfx_state.time = Instant::now();
+                    internal_state.time = Instant::now();
                 }
 
                 // update state to determine the next event. We only record the time (above) if
                 // it was dispatched
-                sfx_state.event = mapped_event;
-                sfx_state.weapon_drawn = Self::weapon_drawn(character);
+                internal_state.event = mapped_event;
             }
         }
-
         self.cleanup(player_entity);
     }
 }
 
-impl CombatEventMapper {
+impl CampfireEventMapper {
     pub fn new() -> Self {
         Self {
             event_history: HashMap::new(),
@@ -134,46 +125,4 @@ impl CombatEventMapper {
             false
         }
     }
-
-    fn map_event(
-        character_state: &CharacterState,
-        previous_state: &PreviousEntityState,
-        loadout: Option<&Loadout>,
-    ) -> SfxEvent {
-        if let Some(active_loadout) = loadout {
-            if let Some(item_config) = &active_loadout.active_item {
-                if let ItemKind::Tool(data) = item_config.item.kind() {
-                    if character_state.is_attack() {
-                        return SfxEvent::Attack(
-                            CharacterAbilityType::from(character_state),
-                            data.kind.clone(),
-                        );
-                    } else if let Some(wield_event) = match (
-                        previous_state.weapon_drawn,
-                        character_state.is_dodge(),
-                        Self::weapon_drawn(character_state),
-                    ) {
-                        (false, false, true) => Some(SfxEvent::Wield(data.kind.clone())),
-                        (true, false, false) => Some(SfxEvent::Unwield(data.kind.clone())),
-                        _ => None,
-                    } {
-                        return wield_event;
-                    }
-                }
-                // Check for attacking states
-            }
-        }
-
-        SfxEvent::Idle
-    }
-
-    /// This helps us determine whether we should be emitting the Wield/Unwield
-    /// events. For now, consider either CharacterState::Wielding or
-    /// ::Equipping to mean the weapon is drawn. This will need updating if the
-    /// animations change to match the wield_duration associated with the weapon
-    fn weapon_drawn(character: &CharacterState) -> bool {
-        character.is_wield() || matches!(character, CharacterState::Equipping { .. })
-    }
 }
-
-#[cfg(test)] mod tests;
