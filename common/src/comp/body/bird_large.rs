@@ -26,7 +26,7 @@ impl Body {
 }
 
 impl From<Body> for super::Body {
-    fn from(body: Body) -> Self { super::Body::BirdMedium(body) }
+    fn from(body: Body) -> Self { super::Body::BirdLarge(body) }
 }
 
 make_case_elim!(
@@ -34,13 +34,8 @@ make_case_elim!(
     #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
     #[repr(u32)]
     pub enum Species {
-        Duck = 0,
-        Chicken = 1,
-        Goose = 2,
-        Peacock = 3,
-        Eagle = 4,
-        Owl = 5,
-        Parrot = 6,
+        Phoenix = 0,
+        Cockatrice = 1,
     }
 );
 
@@ -49,13 +44,8 @@ make_case_elim!(
 /// NOTE: Deliberately don't (yet?) implement serialize.
 #[derive(Clone, Debug, Deserialize)]
 pub struct AllSpecies<SpeciesMeta> {
-    pub duck: SpeciesMeta,
-    pub chicken: SpeciesMeta,
-    pub goose: SpeciesMeta,
-    pub peacock: SpeciesMeta,
-    pub eagle: SpeciesMeta,
-    pub owl: SpeciesMeta,
-    pub parrot: SpeciesMeta,
+    pub phoenix: SpeciesMeta,
+    pub cockatrice: SpeciesMeta,
 }
 
 impl<'a, SpeciesMeta> core::ops::Index<&'a Species> for AllSpecies<SpeciesMeta> {
@@ -64,26 +54,13 @@ impl<'a, SpeciesMeta> core::ops::Index<&'a Species> for AllSpecies<SpeciesMeta> 
     #[inline]
     fn index(&self, &index: &'a Species) -> &Self::Output {
         match index {
-            Species::Duck => &self.duck,
-            Species::Chicken => &self.chicken,
-            Species::Goose => &self.goose,
-            Species::Peacock => &self.peacock,
-            Species::Eagle => &self.eagle,
-            Species::Owl => &self.owl,
-            Species::Parrot => &self.parrot,
+            Species::Phoenix => &self.phoenix,
+            Species::Cockatrice => &self.cockatrice,
         }
     }
 }
 
-pub const ALL_SPECIES: [Species; 7] = [
-    Species::Duck,
-    Species::Chicken,
-    Species::Goose,
-    Species::Peacock,
-    Species::Eagle,
-    Species::Owl,
-    Species::Parrot,
-];
+pub const ALL_SPECIES: [Species; 2] = [Species::Phoenix, Species::Cockatrice];
 
 impl<'a, SpeciesMeta: 'a> IntoIterator for &'a AllSpecies<SpeciesMeta> {
     type IntoIter = std::iter::Copied<std::slice::Iter<'static, Self::Item>>;
@@ -101,4 +78,5 @@ make_case_elim!(
         Male = 1,
     }
 );
+
 pub const ALL_BODY_TYPES: [BodyType; 2] = [BodyType::Female, BodyType::Male];
