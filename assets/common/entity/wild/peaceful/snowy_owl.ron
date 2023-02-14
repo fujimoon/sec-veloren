@@ -1,7 +1,7 @@
 #![enable(implicit_some)]
 (
     name: Automatic,
-    body: RandomWith("owl"),
+    body: RandomWith("snowy_owl"),
     alignment: Alignment(Wild),
     loot: LootTable("common.loot_tables.creature.bird_medium"),
     inventory: (
