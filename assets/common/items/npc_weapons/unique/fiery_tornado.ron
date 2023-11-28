@@ -1,6 +1,6 @@
 ItemDef(
-    name: "Tornado",
-    description: "Tornado weapon",
+    name: "FieryTornado",
+    description: "Fiery Tornado weapon",
     kind: Tool((
         kind: Natural,
         hands: Two,
@@ -16,5 +16,5 @@ ItemDef(
     )),
     quality: Low,
     tags: [],
-    ability_spec: Some(Custom("Tornado")),
+    ability_spec: Some(Custom("FieryTornado")),
 )
