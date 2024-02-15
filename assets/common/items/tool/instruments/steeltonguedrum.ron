@@ -16,5 +16,5 @@ ItemDef(
     )),
     quality: Legendary,
     tags: [Utility],
-    ability_spec: Some(Custom("Steeldrum")),
+    ability_spec: Some(Custom("Steeltonguedrum")),
 )
