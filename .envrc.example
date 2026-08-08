@@ -1,0 +1,9 @@
+# direnv 用テンプレート。
+#   cp .envrc.example .envrc
+# で自分の環境に合わせてパスを編集し、`direnv allow` を実行する。
+# (.envrc 自体は .gitignore 済みなので各自ローカルにのみ置く)
+#
+# sec-veloren (GitHub, LFS実体なし) 上で作業する場合、本物のアセットは
+# GitLab側(veloren)のチェックアウトから読み込む。VELOREN_ASSETS_OVERRIDE
+# ではなく VELOREN_ASSETS を使うこと(詳細: psypher/docs/ja/specs/SecVeloren.md)。
+export VELOREN_ASSETS="/path/to/gitlab-veloren-clone/assets"
