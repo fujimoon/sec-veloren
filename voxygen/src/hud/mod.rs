@@ -1523,7 +1523,7 @@ impl Hud {
         self.pulse += dt.as_secs_f32();
         // FPS
         let fps = global_state.clock.stats().average_tps;
-        let version = format!("Veloren {}", *common::util::DISPLAY_VERSION);
+        let version = format!("sec-veloren {}", *common::util::DISPLAY_VERSION);
         let i18n = &global_state.i18n.read();
 
         if self.show.ingame {
