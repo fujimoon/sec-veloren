@@ -5,7 +5,7 @@
 ## 1. 構成
 
 - `origin` = `https://gitlab.com/veloren/veloren.git` … 本家。アセットの実体(LFSオブジェクト)はここにのみ存在する。
-- `sec` = `https://github.com/fujimoon/sec-veloren.git` … コードのみ。`.gitattributes`でLFS管理されている拡張子(`*.png` `*.vox` `*.ogg` 等)は**全コミット履歴から除外**されており、LFSポインタも一切含まれない。
+- `sec` = `https://github.com/fujimoon/sec-veloren.git` … コードのみ。`.gitattributes`でLFS管理されている拡張子(`*.png` `*.vox` `*.ogg` 等)は**全コミット履歴から除外**されており、LFSポインタも一切含まれない。ただし`psypher/docs/images/`配下は例外で、実体ごと`sec`側のLFSストレージにもpushされ、通常のLFS管理ファイルとしてGitHub上でも閲覧できる。
 - 実行時は `VELOREN_ASSETS` 環境変数で、GitLab側チェックアウトの `assets/` ディレクトリを明示的に指定する。
 
 ```
@@ -41,10 +41,13 @@
 これ1つで完結する。内部の処理:
 
 1. 対象ブランチだけの独立した一時クローンを作成(`GIT_LFS_SKIP_SMUDGE=1`、`--no-local` — 元のこのリポジトリには一切影響しない)
-2. `.gitattributes` からLFS管理パターンを読み取り、`git-filter-repo` で全コミット履歴から除外(ポインタも実体も無くなる)
-3. 除外後にLFS対象ファイルが0件であることを確認
-4. `sec`(GitHub)へpush
-5. 一時クローンを削除
+2. `.gitattributes` からLFS管理パターンを読み取り、`git-filter-repo` の`--filename-callback`で、例外パス(`EXCEPT_PATH_PREFIXES`、既定は`psypher/docs/images/`)配下を除く全コミット履歴からLFS対象ファイルを除外(ポインタも実体も無くなる)
+3. 除外後、例外パス以外にLFS対象ファイルが残っていないことを確認
+4. 例外パス配下のLFS実体を、このリポジトリのローカルLFSキャッシュ(`.git/lfs/objects/`)から取得し、`git lfs push --object-id`で`sec`側のLFSストレージへ個別にアップロード
+5. `sec`(GitHub)へpush
+6. 一時クローンを削除
+
+例外パスを増減させたい場合は、`push-to-sec.sh`内の`EXCEPT_PATH_PREFIXES`配列を編集する。
 
 前提として `git-filter-repo` の導入が必要(初回のみ):
 
@@ -80,7 +83,7 @@ direnvを使う場合は、リポジトリルートの `.envrc.example` を `.en
 
 - GitHub側(`sec-veloren`)単体をcloneしただけではゲームは起動しない。`assets/`ディレクトリ自体が存在しないため、必ずGitLab側のフルチェックアウト(`git lfs pull`済み)を別途用意し、`VELOREN_ASSETS` で指すこと。
 - `authc`(認証クライアント、`server/Cargo.toml` / `client/Cargo.toml`)や `conrod_core`(`voxygen/Cargo.toml`)は `cargo build` 時に本家GitLab(`gitlab.com/veloren/auth.git` 等)へ直接git依存としてアクセスする。sec-veloren単体で本家インフラから完全に独立するわけではない。
-- `psypher/images/logo.png`・`psypher/docs/images/terminal.png`など、拡張子がLFS対象パターンに一致するファイルは、用途を問わず`sec-veloren`側の履歴から除外される。README等の画像リンクはGitHub上では表示されない(GitLab側でのみ閲覧可能)。
+- 拡張子がLFS対象パターンに一致するファイルは、原則として用途を問わず`sec-veloren`側の履歴から除外される。README等の画像リンクはGitHub上では表示されない(GitLab側でのみ閲覧可能)。**例外は`psypher/docs/images/`配下**(`push-to-sec.sh`の`EXCEPT_PATH_PREFIXES`)で、ここは実体ごと`sec`側のLFSストレージにもpushされるため、GitHub上でも通常通り表示・閲覧できる。この実体pushにはローカルの`.git/lfs/objects/`キャッシュを使うため、対象ファイルを事前に`git lfs pull`済みの状態(通常の開発環境であれば自動的に満たされている)で実行すること。
 - `sec-veloren`側のコミットハッシュは`origin`(GitLab)と一致しない(除外処理で全コミットが書き換わるため)。
 - 履歴を書き換える処理のため、`push-to-sec.sh`実行には多少時間がかかる(veloren全履歴で数十秒程度)。
 - **再実行時のコミットハッシュは、以前のpush結果と一致する保証がない**(クローン範囲や実行時の状況次第で、過去分を含めて全コミットのハッシュが変わりうる)。そのため `push-to-sec.sh` は毎回 `git push --force` で`sec`側の`master`を上書きする。**`sec-veloren`のmasterはこのスクリプトだけが更新するものとし、他から直接pushしないこと**(force pushで消えるため)。

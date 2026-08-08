@@ -5,7 +5,7 @@ A setup for distributing code via a GitHub repository, `fujimoon/sec-veloren`, s
 ## 1. Layout
 
 - `origin` = `https://gitlab.com/veloren/veloren.git` — upstream. The actual LFS objects (asset binaries) live only here.
-- `sec` = `https://github.com/fujimoon/sec-veloren.git` — code only. Every extension managed by Git LFS in `.gitattributes` (`*.png`, `*.vox`, `*.ogg`, etc.) is **stripped from the entire commit history**, so it contains no LFS pointers either.
+- `sec` = `https://github.com/fujimoon/sec-veloren.git` — code only. Every extension managed by Git LFS in `.gitattributes` (`*.png`, `*.vox`, `*.ogg`, etc.) is **stripped from the entire commit history**, so it contains no LFS pointers either — except for anything under `psypher/docs/images/`, which is pushed binary-and-all to `sec`'s own LFS storage and renders on GitHub like any normal LFS-tracked file.
 - At runtime, the `VELOREN_ASSETS` environment variable is set explicitly to the `assets/` directory of a GitLab-side checkout.
 
 ```
@@ -42,10 +42,13 @@ The original plan was to push code plus LFS **pointers** only, with no binary co
 This one command does everything:
 
 1. Creates an isolated temporary clone of just the target branch (`GIT_LFS_SKIP_SMUDGE=1`, `--no-local` — this repo is never touched)
-2. Reads the LFS-managed patterns from `.gitattributes` and strips them from every commit in history with `git-filter-repo` (removing both the binaries and the pointers)
-3. Verifies zero LFS-tracked files remain
-4. Pushes to `sec` (GitHub)
-5. Deletes the temporary clone
+2. Reads the LFS-managed patterns from `.gitattributes` and, via `git-filter-repo`'s `--filename-callback`, strips them from every commit in history — except anything under the exception paths (`EXCEPT_PATH_PREFIXES`, defaulting to `psypher/docs/images/`)
+3. Verifies no LFS-tracked files remain outside the exception paths
+4. Fetches the exception paths' LFS binaries from this repo's local LFS cache (`.git/lfs/objects/`) and uploads them individually to `sec`'s LFS storage with `git lfs push --object-id`
+5. Pushes to `sec` (GitHub)
+6. Deletes the temporary clone
+
+To add or remove exception paths, edit the `EXCEPT_PATH_PREFIXES` array in `push-to-sec.sh`.
 
 Prerequisite, once: `git-filter-repo`.
 
@@ -81,7 +84,7 @@ The canary check at startup (`common/assets/src/fs.rs`) always reads from `VELOR
 
 - Cloning `sec-veloren` alone is not enough to run the game — there's no `assets/` directory in it at all. You always need a full GitLab-side checkout (with `git lfs pull` already run) and must point `VELOREN_ASSETS` at it.
 - `authc` (auth client, in `server/Cargo.toml` / `client/Cargo.toml`) and `conrod_core` (`voxygen/Cargo.toml`) are pulled as git dependencies directly from upstream GitLab (`gitlab.com/veloren/auth.git`, etc.) at `cargo build` time. sec-veloren does not make the build fully independent of upstream infrastructure.
-- Any file matching an LFS-managed extension pattern — including things like `psypher/images/logo.png` or `psypher/docs/images/terminal.png` — gets stripped from `sec-veloren`'s history regardless of purpose. Image links in docs/README won't render on GitHub (they're only viewable on the GitLab side).
+- Any file matching an LFS-managed extension pattern generally gets stripped from `sec-veloren`'s history regardless of purpose, so image links in docs/README won't render on GitHub (they're only viewable on the GitLab side) — **except under `psypher/docs/images/`** (`EXCEPT_PATH_PREFIXES` in `push-to-sec.sh`), which is pushed binary-and-all to `sec`'s own LFS storage and therefore renders normally on GitHub too. Pushing those binaries relies on this repo's local `.git/lfs/objects/` cache, so make sure they're already `git lfs pull`ed locally (true by default in a normal dev checkout) before running the script.
 - Commit hashes on `sec-veloren` do not match `origin` (GitLab), since every commit is rewritten during the strip.
 - Because history is rewritten, `push-to-sec.sh` takes some time to run (tens of seconds, given Veloren's full history).
 - **Re-running the script is not guaranteed to reproduce the same commit hashes as a previous push** — depending on clone scope and other conditions at run time, even old, content-identical commits can hash differently. Because of this, `push-to-sec.sh` always `git push --force`es `sec`'s `master`. Treat `sec-veloren`'s `master` as owned exclusively by this script — never push to it directly from elsewhere, since a subsequent run will force-overwrite it.
