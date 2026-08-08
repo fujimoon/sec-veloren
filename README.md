@@ -1,12 +1,14 @@
 <!-- SPDX-SnippetBegin -->
 <!-- SPDX-SnippetCopyrightText: 2025 Hrom -->
 <!-- SPDX-License-Identifier: CC-BY-SA-4.0 -->
-# ![Veloren logo on a screenshot](/psypher/images/logo.png)
+# ![Veloren logo on a screenshot](/psypher/docs/images/logo.png)
 <!-- SPDX-SnippetEnd -->
 
 This project is forked from
 [veloren](https://gitlab.com/veloren/veloren),
 and is being developed as a game where you can also learn about computers and cybersecurity.
+
+See [Spec.md](psypher/docs/en/Spec.md) for the details of the features added in this fork.
 
 [![discord](https://img.shields.io/discord/449602562165833758?logo=discord&logoColor=%23f8f8f8&label=discord&color=%23788dd5)](https://veloren.net/discord)
 [![zulip](https://img.shields.io/badge/zulip-join_chat-dodgerblue.svg?logo=zulip)](https://veloren.net/zulip)
