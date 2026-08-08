@@ -1,7 +1,7 @@
 <!-- SPDX-SnippetBegin -->
 <!-- SPDX-SnippetCopyrightText: 2025 Hrom -->
 <!-- SPDX-License-Identifier: CC-BY-SA-4.0 -->
-# ![Veloren logo on a screenshot](https://s3.eu-central-2.wasabisys.com/veloren-blog/cdn/common/2025-06-29_Hrom_bestest-banner.webp)
+# ![Veloren logo on a screenshot](/psypher/images/logo.png)
 <!-- SPDX-SnippetEnd -->
 
 [![discord](https://img.shields.io/discord/449602562165833758?logo=discord&logoColor=%23f8f8f8&label=discord&color=%23788dd5)](https://veloren.net/discord)
