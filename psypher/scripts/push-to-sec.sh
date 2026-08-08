@@ -83,12 +83,10 @@ PYEOF
 git filter-repo --force --filename-callback "$CALLBACK_FILE"
 rm -f "$CALLBACK_FILE"
 
-echo "==> 除外漏れが無いか確認(例外パス配下以外にLFS対象ファイルが残っていないか)"
+echo "==> 除外漏れが無いか確認(例外パス配下以外にLFS対象ファイルが残っていないか。HEAD時点のみのチェック)"
 REMAINING_BAD=()
-REMAINING_OIDS=()
 while IFS= read -r line; do
   [ -z "$line" ] && continue
-  oid="${line%% *}"
   file="$(printf '%s\n' "$line" | cut -d' ' -f3-)"
   keep=0
   for p in "${EXCEPT_PATH_PREFIXES[@]}"; do
@@ -96,11 +94,7 @@ while IFS= read -r line; do
       "$p"*) keep=1 ;;
     esac
   done
-  if [ "$keep" -eq 1 ]; then
-    REMAINING_OIDS+=("$oid")
-  else
-    REMAINING_BAD+=("$file")
-  fi
+  [ "$keep" -eq 0 ] && REMAINING_BAD+=("$file")
 done < <(git lfs ls-files -l)
 
 if [ "${#REMAINING_BAD[@]}" -ne 0 ]; then
@@ -108,6 +102,38 @@ if [ "${#REMAINING_BAD[@]}" -ne 0 ]; then
   printf '  %s\n' "${REMAINING_BAD[@]}" >&2
   exit 1
 fi
+
+echo "==> 例外パス配下の全履歴分(過去に差し替えられた版も含む)のLFSオブジェクトIDを収集"
+# `git lfs ls-files` はHEAD時点のファイルしか見ないため、履歴の途中で
+# 差し替えられた古いoid(例: 過去のコミットで参照されている旧バージョンの画像)
+# を見落とす。pushするブランチの全履歴をblob単位で走査し、例外パス配下で
+# LFSポインタ形式のblobが参照している oid を漏れなく集める。
+GREP_ARGS=()
+for p in "${EXCEPT_PATH_PREFIXES[@]}"; do
+  GREP_ARGS+=(-e "$p")
+done
+REMAINING_OIDS=()
+while IFS=' ' read -r blob_sha path; do
+  [ -z "$path" ] && continue
+  keep=0
+  for p in "${EXCEPT_PATH_PREFIXES[@]}"; do
+    case "$path" in
+      "$p"*) keep=1 ;;
+    esac
+  done
+  [ "$keep" -eq 0 ] && continue
+  oid_line="$(git cat-file -p "$blob_sha" 2>/dev/null | sed -n '2p')"
+  case "$oid_line" in
+    "oid sha256:"*)
+      oid="${oid_line#oid sha256:}"
+      dup=0
+      for existing in "${REMAINING_OIDS[@]:-}"; do
+        [ "$existing" = "$oid" ] && dup=1 && break
+      done
+      [ "$dup" -eq 0 ] && REMAINING_OIDS+=("$oid")
+      ;;
+  esac
+done < <(git rev-list --objects "$BRANCH" | grep -F "${GREP_ARGS[@]}")
 
 git remote add "$REMOTE" "$REMOTE_URL"
 
