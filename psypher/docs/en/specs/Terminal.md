@@ -27,11 +27,23 @@ Give developers/debuggers instant access to a real shell without leaving the run
 Built on top of the existing `egui-ui` feature (enabled by default). No new render pipeline is required — it rides on egui's existing wgpu compositing.
 
 ```
-Debug Control (existing egui window)
-  └─ "Terminal" checkbox
-       └─ TerminalState::new()   … spawns a pty + shell
-            └─ TerminalState::show()  … every frame, paints the grid via egui::Painter
+psypher-terminal (standalone crate, psypher/voxygen/egui/)
+  └─ pub struct TerminalState { .. }   … knows nothing about Veloren. Depends only on egui + alacritty_terminal
+
+veloren-voxygen-egui (voxygen/egui/)
+  └─ Debug Control (existing egui window)
+       └─ "Terminal" checkbox
+            └─ TerminalState::new()   … spawns a pty + shell
+                 └─ TerminalState::show()  … every frame, paints the grid via egui::Painter
 ```
+
+### Loose coupling
+
+The implementation itself doesn't live inside the `veloren-voxygen-egui` crate — it's been extracted into its own crate, `psypher-terminal`, at [`psypher/voxygen/egui/`](../../../voxygen/egui/).
+
+- `psypher-terminal` depends on nothing but `egui` and `alacritty_terminal`. It imports neither `client` nor `common`, nor any Veloren-specific type at all. It's a fully self-contained crate — `cargo check -p psypher-terminal` succeeds entirely on its own.
+- `voxygen/egui/Cargo.toml` pulls it in as a plain `path` dependency; the only thing `veloren-voxygen-egui` ever sees is the public API, `TerminalState::{new, show}`.
+- It is **not** listed in veloren's workspace `members`. As a path dependency it still ends up in the same build graph as the final `veloren-voxygen` binary, but because it's a self-contained package, changes to `veloren-voxygen-egui`'s internals (ECS, client state, etc.) can never affect it.
 
 ### Libraries used
 
@@ -39,6 +51,8 @@ Debug Control (existing egui window)
 |---|---|
 | [`alacritty_terminal`](https://docs.rs/alacritty_terminal) 0.25 | The same pty-spawning (`tty::new`) and ANSI/VTE parsing + terminal grid state machinery that the Alacritty terminal emulator itself is built on — including the background thread that reads pty output and keeps `Term` up to date |
 | `egui` (existing dependency) | Renders the semi-transparent window, captures keyboard/text input events, and draws the grid (rectangles + text) |
+
+Both `psypher-terminal` and `veloren-voxygen-egui` require `egui = "0.33"`, so the final build resolves them to the same version — no type mismatch across the crate boundary.
 
 `egui` (0.33) and `alacritty_terminal` are independent crates — `alacritty_terminal` has no dependency on egui — so there's no version conflict between them.
 
@@ -81,9 +95,16 @@ No extra code was needed for this: [`voxygen/src/run.rs`](../../../../voxygen/sr
 
 ## 4. Files changed
 
-- [`voxygen/egui/src/terminal.rs`](../../../../voxygen/egui/src/terminal.rs) (new) — the implementation
-- [`voxygen/egui/Cargo.toml`](../../../../voxygen/egui/Cargo.toml) — adds the `alacritty_terminal` dependency
-- [`voxygen/egui/src/lib.rs`](../../../../voxygen/egui/src/lib.rs) — adds the "Terminal" checkbox to the "Debug Control" window, and a `terminal: Option<TerminalState>` field on `EguiInnerState` (lazily created when checked, dropped — killing the shell — when unchecked)
+`psypher-terminal` (new crate, no Veloren dependency):
+
+- [`psypher/voxygen/egui/Cargo.toml`](../../../voxygen/egui/Cargo.toml) — crate definition; depends only on `egui` and `alacritty_terminal`
+- [`psypher/voxygen/egui/src/lib.rs`](../../../voxygen/egui/src/lib.rs) — thin entry point, just `pub use terminal::TerminalState;`
+- [`psypher/voxygen/egui/src/terminal.rs`](../../../voxygen/egui/src/terminal.rs) — the implementation
+
+`veloren-voxygen-egui` (existing crate, wiring only):
+
+- [`voxygen/egui/Cargo.toml`](../../../../voxygen/egui/Cargo.toml) — adds a path dependency on `psypher-terminal`
+- [`voxygen/egui/src/lib.rs`](../../../../voxygen/egui/src/lib.rs) — adds the "Terminal" checkbox to the "Debug Control" window, and a `terminal: Option<TerminalState>` field on `EguiInnerState` (lazily created when checked, dropped — killing the shell — when unchecked). Only imports `psypher_terminal::TerminalState`; never touches its internals
 
 ## 5. Known limitations (v1)
 

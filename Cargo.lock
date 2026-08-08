@@ -6040,6 +6040,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "psypher-terminal"
+version = "0.1.0"
+dependencies = [
+ "alacritty_terminal",
+ "egui",
+ "tracing",
+]
+
+[[package]]
 name = "pulley-interpreter"
 version = "45.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -9186,12 +9195,11 @@ dependencies = [
 name = "veloren-voxygen-egui"
 version = "0.18.0"
 dependencies = [
- "alacritty_terminal",
  "egui",
  "egui-winit",
  "egui_plot",
  "lazy_static",
- "tracing",
+ "psypher-terminal",
  "veloren-client",
  "veloren-common",
  "veloren-common-dynlib",

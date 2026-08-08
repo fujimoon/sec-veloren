@@ -27,11 +27,23 @@ Veloren (voxygen) のデバッグ用egui UI上に追加した、**本物のシ�
 既存の `egui-ui` フィーチャ(デフォルト有効)上に実装。追加の描画パイプラインは不要で、既存のegui→wgpu合成にそのまま乗っている。
 
 ```
-Debug Control (既存の egui ウィンドウ)
-  └─ "Terminal" checkbox
-       └─ TerminalState::new()  … pty + シェルを spawn
-            └─ TerminalState::show()  … 毎フレーム、グリッドを egui::Painter で描画
+psypher-terminal (独立クレート, psypher/voxygen/egui/)
+  └─ pub struct TerminalState { .. }   … Veloren を一切知らない。egui + alacritty_terminal のみに依存
+
+veloren-voxygen-egui (voxygen/egui/)
+  └─ Debug Control (既存の egui ウィンドウ)
+       └─ "Terminal" checkbox
+            └─ TerminalState::new()  … pty + シェルを spawn
+                 └─ TerminalState::show()  … 毎フレーム、グリッドを egui::Painter で描画
 ```
+
+### 疎結合な構成
+
+実装本体は `veloren-voxygen-egui` クレートの中には置かず、[`psypher/voxygen/egui/`](../../../voxygen/egui/) に独立したクレート `psypher-terminal` として切り出している。
+
+- `psypher-terminal` は `egui` と `alacritty_terminal` にしか依存しない。`client`/`common` はもちろん、Veloren固有の型を一切importしていない。単体でも `cargo check -p psypher-terminal` が通る、完全に自己完結したクレート
+- `voxygen/egui/Cargo.toml` から `path` 依存として参照するだけで、`veloren-voxygen-egui` 側が見えるのは公開API `TerminalState::{new, show}` のみ
+- veloren本体のワークスペース(`members`)には**含めていない**。パス依存としては同じ最終バイナリ(`veloren-voxygen`)のビルドグラフに乗るが、独立したパッケージとして自己完結しているため、`veloren-voxygen-egui` 側の内部実装(ECS・クライアント状態など)を変更してもこのクレートには一切影響しない
 
 ### 使用ライブラリ
 
@@ -40,7 +52,7 @@ Debug Control (既存の egui ウィンドウ)
 | [`alacritty_terminal`](https://docs.rs/alacritty_terminal) 0.25 | Alacritty本体が使っているのと同じ pty 起動 (`tty::new`) ＋ ANSI/VTEパーサ ＋ ターミナルグリッド状態管理。バックグラウンドスレッドで pty 出力を読み、`Term` を更新する仕組みまで含めて提供される |
 | `egui` (既存依存) | 半透明ウィンドウの表示、キー/テキスト入力イベントの取得、グリッドの描画(矩形・テキスト) |
 
-egui 側は 0.33、alacritty_terminal は独立したクレートで egui に依存しないため、バージョン競合なし。
+`psypher-terminal` と `veloren-voxygen-egui` はどちらも `egui = "0.33"` を要求するため、最終的なビルドでは同一バージョンに解決され、型の不整合は起きない。
 
 ### シェル起動
 
@@ -81,9 +93,16 @@ Frame::window(&ctx.style())
 
 ## 4. 変更ファイル
 
-- [`voxygen/egui/src/terminal.rs`](../../../../voxygen/egui/src/terminal.rs) (新規) — 本体実装
-- [`voxygen/egui/Cargo.toml`](../../../../voxygen/egui/Cargo.toml) — `alacritty_terminal` 依存追加
-- [`voxygen/egui/src/lib.rs`](../../../../voxygen/egui/src/lib.rs) — 「Debug Control」ウィンドウへ「Terminal」チェックボックス追加、`EguiInnerState` に `terminal: Option<TerminalState>` を追加(チェックON時に遅延生成、OFF時にDrop=シェル終了)
+`psypher-terminal`(新規クレート、Veloren非依存):
+
+- [`psypher/voxygen/egui/Cargo.toml`](../../../voxygen/egui/Cargo.toml) — クレート定義。`egui` / `alacritty_terminal` のみに依存
+- [`psypher/voxygen/egui/src/lib.rs`](../../../voxygen/egui/src/lib.rs) — `pub use terminal::TerminalState;` のみの薄いエントリポイント
+- [`psypher/voxygen/egui/src/terminal.rs`](../../../voxygen/egui/src/terminal.rs) — 本体実装
+
+`veloren-voxygen-egui`(既存クレート、配線のみ):
+
+- [`voxygen/egui/Cargo.toml`](../../../../voxygen/egui/Cargo.toml) — `psypher-terminal` へのpath依存を追加
+- [`voxygen/egui/src/lib.rs`](../../../../voxygen/egui/src/lib.rs) — 「Debug Control」ウィンドウへ「Terminal」チェックボックス追加、`EguiInnerState` に `terminal: Option<TerminalState>` を追加(チェックON時に遅延生成、OFF時にDrop=シェル終了)。`psypher_terminal::TerminalState` をimportするだけで、内部実装には触れない
 
 ## 5. 既知の制限 (v1)
 

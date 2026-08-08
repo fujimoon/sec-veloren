@@ -320,7 +320,12 @@ impl TerminalState {
         if bytes.is_empty() {
             return;
         }
-        let _ = self.notifier.send(Msg::Input(Cow::Owned(bytes.to_vec())));
+        if let Err(err) = self.notifier.send(Msg::Input(Cow::Owned(bytes.to_vec()))) {
+            // Most likely the shell process has already exited and the reader
+            // thread with it - log it once loudly rather than swallowing every
+            // subsequent keystroke silently.
+            tracing::warn!("Embedded terminal: failed to write input to pty: {err}");
+        }
     }
 }
 

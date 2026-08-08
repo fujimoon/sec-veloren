@@ -1,0 +1,18 @@
+[package]
+name = "psypher-terminal"
+version = "0.1.0"
+edition = "2024"
+license = "GPL-3.0-or-later"
+description = "A real, pty-backed terminal widget for egui, extracted from veloren-voxygen-egui."
+
+# Intentionally NOT listed in the veloren workspace's `members`, and does not
+# declare its own `[workspace]` either (a path dependency can't claim to be a
+# second workspace root - cargo rejects that). It rides along in the same
+# Cargo.lock/target-dir as everything else that gets linked into veloren-voxygen,
+# but it has its own Cargo.toml/versioning, doesn't inherit `[workspace.lints]`,
+# and - the part that actually matters for coupling - knows nothing about
+# Veloren: consumers only ever see it through the public API in `lib.rs`.
+[dependencies]
+egui = "0.33"
+alacritty_terminal = "0.25"
+tracing = "0.1"

@@ -6,7 +6,6 @@ compile_error!("Can't use both \"be-dyn-lib\" and \"use-dyn-lib\" features at on
 mod admin;
 mod character_states;
 mod experimental_shaders;
-mod terminal;
 mod widgets;
 
 use client::{Client, Join, LendJoin, World, WorldExt};
@@ -19,11 +18,11 @@ use common::{
 use core::mem;
 use egui::{CollapsingHeader, Color32, Context, Grid, Pos2, ScrollArea, Slider, Ui, Window};
 use egui_plot::{Line, Plot, PlotPoints};
+use psypher_terminal::TerminalState;
 
 use crate::{
     admin::draw_admin_commands_window, character_states::draw_char_state_group,
-    experimental_shaders::draw_experimental_shaders_window, terminal::TerminalState,
-    widgets::two_col_row,
+    experimental_shaders::draw_experimental_shaders_window, widgets::two_col_row,
 };
 use common::comp::{
     Body, Fluid,
