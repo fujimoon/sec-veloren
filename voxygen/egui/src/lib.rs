@@ -6,6 +6,7 @@ compile_error!("Can't use both \"be-dyn-lib\" and \"use-dyn-lib\" features at on
 mod admin;
 mod character_states;
 mod experimental_shaders;
+mod terminal;
 mod widgets;
 
 use client::{Client, Join, LendJoin, World, WorldExt};
@@ -21,7 +22,8 @@ use egui_plot::{Line, Plot, PlotPoints};
 
 use crate::{
     admin::draw_admin_commands_window, character_states::draw_char_state_group,
-    experimental_shaders::draw_experimental_shaders_window, widgets::two_col_row,
+    experimental_shaders::draw_experimental_shaders_window, terminal::TerminalState,
+    widgets::two_col_row,
 };
 use common::comp::{
     Body, Fluid,
@@ -98,6 +100,9 @@ pub struct EguiInnerState {
     frame_times: Vec<f32>,
     windows: EguiWindows,
     debug_vectors_enabled: bool,
+    /// Lazily spawned when the "Terminal" checkbox is first ticked, and dropped
+    /// (killing the shell) once the window is closed again.
+    terminal: Option<TerminalState>,
 }
 
 #[derive(Clone, Default)]
@@ -109,6 +114,7 @@ pub struct EguiWindows {
     frame_time: bool,
     ecs_entities: bool,
     experimental_shaders: bool,
+    terminal: bool,
 }
 
 impl Default for EguiInnerState {
@@ -121,6 +127,7 @@ impl Default for EguiInnerState {
             frame_times: Vec::new(),
             windows: EguiWindows::default(),
             debug_vectors_enabled: false,
+            terminal: None,
         }
     }
 }
@@ -272,6 +279,7 @@ pub fn maintain_egui_inner(
                     ui.checkbox(&mut windows.ecs_entities, "ECS Entities");
                     ui.checkbox(&mut windows.frame_time, "Frame Time");
                     ui.checkbox(&mut windows.experimental_shaders, "Experimental Shaders");
+                    ui.checkbox(&mut windows.terminal, "Terminal");
                     ui.checkbox(&mut debug_vectors_enabled_mut, "Show Debug Vectors");
                 });
             });
@@ -326,6 +334,20 @@ pub fn maintain_egui_inner(
                 ))
             });
         });
+
+    if windows.terminal {
+        if egui_state.terminal.is_none() {
+            egui_state.terminal = TerminalState::new();
+        }
+        if let Some(terminal) = &mut egui_state.terminal {
+            terminal.show(ctx, &mut windows.terminal);
+        } else {
+            // Failed to open a pty; don't keep retrying every frame.
+            windows.terminal = false;
+        }
+    } else {
+        egui_state.terminal = None;
+    }
 
     if windows.ecs_entities {
         let ecs = client.state().ecs();

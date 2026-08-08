@@ -20,3 +20,7 @@ egui-winit = "0.33"
 lazy_static = { workspace = true }
 winit = "0.30"
 common-dynlib = {package = "veloren-common-dynlib", path = "../../common/dynlib", optional = true}
+# Powers the embedded debug terminal (voxygen/egui/src/terminal.rs): a real pty +
+# shell, using the same building blocks the Alacritty terminal emulator is built on.
+alacritty_terminal = "0.25"
+tracing = { workspace = true }
