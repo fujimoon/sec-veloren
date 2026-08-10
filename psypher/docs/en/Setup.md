@@ -1,6 +1,6 @@
 # Setup & Launch
 
-Steps from cloning the source to building and launching the game. For a more detailed macOS walkthrough (with real gotchas encountered along the way, in Japanese), see [SetUpForMac.md](../../../SetUpForMac.md). For the layout used when distributing code via GitHub's `sec-veloren`, see [SecVeloren.md](specs/SecVeloren.md).
+Steps from cloning the source to building and launching the game. For a more detailed macOS walkthrough (with real gotchas encountered along the way, in Japanese), see [SetUpForMac.md](../../../SetUpForMac.md). For the layout used when distributing code via GitHub's `sec-veloren`, see [SecVeloren.md](SecVeloren.md).
 
 ## 1. Prerequisites
 
@@ -37,7 +37,7 @@ A message like `Filtering content: 100% (6375/6375)` indicates the LFS content (
 
 ### 2.2 Cloning sec-veloren (GitHub) instead
 
-This contains code and LFS pointers only — no real asset binaries. See [SecVeloren.md](specs/SecVeloren.md) for the full procedure and how assets are supplied.
+This contains code and LFS pointers only — no real asset binaries. See [SecVeloren.md](SecVeloren.md) for the full procedure and how assets are supplied.
 
 ```bash
 ./psypher/scripts/clone-sec-veloren.sh
@@ -69,7 +69,7 @@ INFO veloren_voxygen::singleplayer: Starting server-cli...
 INFO veloren_voxygen::singleplayer: Client connected!
 ```
 
-If you're working from sec-veloren, set `VELOREN_ASSETS` before launching (see [SecVeloren.md](specs/SecVeloren.md)) — without it, the asset-loading canary check panics at startup.
+If you're working from sec-veloren, set `VELOREN_ASSETS` before launching (see [SecVeloren.md](SecVeloren.md)) — without it, the asset-loading canary check panics at startup.
 
 ### 4.2 Running only the server
 
@@ -91,5 +91,5 @@ cargo run
 ## 5. Related docs
 
 - [SetUpForMac.md](../../../SetUpForMac.md) — detailed macOS setup steps and a troubleshooting table (Japanese)
-- [SecVeloren.md](specs/SecVeloren.md) — the GitHub (`sec-veloren`) code distribution layout and how assets are handled
+- [SecVeloren.md](SecVeloren.md) — the GitHub (`sec-veloren`) code distribution layout and how assets are handled
 - [Terminal.md](specs/Terminal.md) — the debug semi-transparent terminal feature

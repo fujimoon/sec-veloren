@@ -5,4 +5,4 @@
 ## 仕様一覧
 
 - [Terminal](specs/Terminal.md) — voxygenのデバッグ用egui UIに追加した、本物のシェルが動く半透明ターミナルの仕様。
-- [sec-veloren 配布構成](specs/SecVeloren.md) — 大きなアセットはGitLab側のGit LFSに残したまま、GitHubの `fujimoon/sec-veloren` リポジトリでコードを配布する構成。
+- [sec-veloren 配布構成](SecVeloren.md) — 大きなアセットはGitLab側のGit LFSに残したまま、GitHubの `fujimoon/sec-veloren` リポジトリでコードを配布する構成。

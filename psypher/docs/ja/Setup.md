@@ -1,6 +1,6 @@
 # セットアップと起動方法
 
-ソースコードのクローンからビルド・起動までの手順。macOS向けのより詳細な手順（実際に引っかかったポイント付き）は [SetUpForMac.md](../../../SetUpForMac.md) を、GitHub上の `sec-veloren` を使う場合の構成は [SecVeloren.md](specs/SecVeloren.md) を参照。
+ソースコードのクローンからビルド・起動までの手順。macOS向けのより詳細な手順（実際に引っかかったポイント付き）は [SetUpForMac.md](../../../SetUpForMac.md) を、GitHub上の `sec-veloren` を使う場合の構成は [SecVeloren.md](SecVeloren.md) を参照。
 
 ## 1. 前提ツール
 
@@ -37,7 +37,7 @@ cd veloren
 
 ### 2.2 sec-veloren(GitHub)からクローンする場合
 
-こちらはコード＋LFSポインタのみで、アセットの実体は含まれていない。手順・アセットの指定方法は [SecVeloren.md](specs/SecVeloren.md) を参照。
+こちらはコード＋LFSポインタのみで、アセットの実体は含まれていない。手順・アセットの指定方法は [SecVeloren.md](SecVeloren.md) を参照。
 
 ```bash
 ./psypher/scripts/clone-sec-veloren.sh
@@ -69,7 +69,7 @@ INFO veloren_voxygen::singleplayer: Starting server-cli...
 INFO veloren_voxygen::singleplayer: Client connected!
 ```
 
-sec-velorenを使っている場合は、起動前に必ず `VELOREN_ASSETS` を設定する（[SecVeloren.md](specs/SecVeloren.md) 参照）。設定していないとアセット読み込みチェック(カナリアチェック)でパニックする。
+sec-velorenを使っている場合は、起動前に必ず `VELOREN_ASSETS` を設定する（[SecVeloren.md](SecVeloren.md) 参照）。設定していないとアセット読み込みチェック(カナリアチェック)でパニックする。
 
 ### 4.2 サーバーのみ起動する場合
 
@@ -91,5 +91,5 @@ cargo run
 ## 5. 関連ドキュメント
 
 - [SetUpForMac.md](../../../SetUpForMac.md) — macOS向けの詳細セットアップ手順とトラブルシューティング表
-- [SecVeloren.md](specs/SecVeloren.md) — GitHub(`sec-veloren`)へのコード配布構成とアセットの扱い
+- [SecVeloren.md](SecVeloren.md) — GitHub(`sec-veloren`)へのコード配布構成とアセットの扱い
 - [Terminal.md](specs/Terminal.md) — デバッグ用の半透明ターミナル機能

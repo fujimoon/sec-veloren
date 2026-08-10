@@ -14,7 +14,7 @@
 # 通常のLFS管理ファイルとして表示・閲覧できる。
 #
 # 前提(初回のみ): brew install git-filter-repo
-# 詳細: psypher/docs/ja/specs/SecVeloren.md
+# 詳細: psypher/docs/ja/SecVeloren.md
 set -euo pipefail
 
 REMOTE="sec"

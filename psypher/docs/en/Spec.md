@@ -5,4 +5,4 @@ An index of the design/specification documents for the features added on top of 
 ## Available specs
 
 - [Terminal](specs/Terminal.md) — Specification for the semi-transparent, real-shell terminal window added to voxygen's debug egui UI.
-- [sec-veloren Distribution Layout](specs/SecVeloren.md) — How code is distributed via the `fujimoon/sec-veloren` GitHub repository while keeping large assets on GitLab's Git LFS.
+- [sec-veloren Distribution Layout](SecVeloren.md) — How code is distributed via the `fujimoon/sec-veloren` GitHub repository while keeping large assets on GitLab's Git LFS.

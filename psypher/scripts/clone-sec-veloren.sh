@@ -3,7 +3,7 @@
 # 実アセットはこのスクリプトでは取得しない。別途 GitLab 側の veloren を
 # clone(+ git lfs pull)しておき、起動時に VELOREN_ASSETS でそちらを指すこと。
 #
-# 詳細: psypher/docs/ja/specs/SecVeloren.md
+# 詳細: psypher/docs/ja/SecVeloren.md
 set -euo pipefail
 
 REPO_URL="https://github.com/fujimoon/sec-veloren.git"
