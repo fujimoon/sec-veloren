@@ -67,12 +67,10 @@ const ROW_SPACING: i32 = 30;
 const LEVEL_SHIFT: i32 = 16;
 /// How far straight up from the player the dungeon is anchored on entry.
 const ANCHOR_UP: i32 = 500;
-/// Temporary kill switch for corridor carving, while the rooms themselves are
-/// being checked out in isolation — set back to `true` to re-enable
-/// connecting corridors between rooms. Rooms are still drawn (and their
-/// `TriggerZone`s still recorded) either way; only `carve_corridor` is
-/// skipped, so with this `false` every room is a sealed box.
-const DRAW_CORRIDORS: bool = false;
+/// Corridor carving is back on: `carve_corridor` no longer stamps any
+/// thickness in the direction of travel (see its doc comment), so it has no
+/// "end cap" left to reseal a doorway `punch_doorway` just opened.
+const DRAW_CORRIDORS: bool = true;
 /// How many siblings/children either side of "current"/"selected" to draw.
 const WINDOW_RADIUS: usize = 2;
 /// Width (in blocks) of a corridor tunnel.
@@ -83,9 +81,15 @@ const CORRIDOR_WIDTH: i32 = 4;
 /// corridor carved at this height (see `carve_corridor`) lines up flush with
 /// the room floor instead of opening a hole near the ceiling.
 const DOOR_Z: i32 = -ROOM_HALF.z + 1;
-/// Doorway height in blocks, starting from `DOOR_Z`. Comfortably tall relative
-/// to the room's 13-block height, not just tall enough to squeeze through.
-const DOOR_HEIGHT: i32 = 6;
+/// Interior headroom of a corridor tunnel (blocks of air above its floor).
+/// 2 was tight enough that the 2:1 ramp slope (`CORRIDOR_LEN`:`LEVEL_SHIFT`)
+/// could still catch a player's head; 4 gives real clearance.
+const CORRIDOR_HEADROOM: i32 = 4;
+/// Doorway height in blocks, starting from `DOOR_Z`. Must match
+/// `CORRIDOR_HEADROOM` exactly — a taller doorway than the tunnel behind it
+/// would leave the extra height as a hole straight through to open sky
+/// (defeating the corridor's fall-prevention shell entirely).
+const DOOR_HEIGHT: i32 = CORRIDOR_HEADROOM;
 
 fn wall_current() -> Block { Block::new(BlockKind::Rock, Rgb::new(225, 225, 210)) }
 
@@ -231,88 +235,84 @@ fn punch_doorway(
     }));
 }
 
-/// Carve a fully-enclosed walkable tunnel (side walls, floor, ceiling, air
-/// interior) in a straight line from `from` to `to`, wide enough to punch a
-/// doorway through any room shell it touches at either end (rooms are drawn
-/// first, corridors after — same "corridors drawn last so they open up room
-/// walls" trick the ASCII `psy dungeon` renderer uses). Handles both flat
-/// corridors (peers) and ramped ones (parent/child, which sit at a different
-/// height) via simple linear interpolation.
+/// Carve a fully-enclosed walkable tunnel (floor, left/right walls, ceiling,
+/// air interior) in a straight *horizontal* line from `from` to `to` — the
+/// caller's job is to ensure exactly one of `diff.x`/`diff.y` is nonzero
+/// (true for every caller here: parent/child links run along X, peer links
+/// along Y). A height difference between `from`/`to` (parent: `+LEVEL_SHIFT`,
+/// child: `-LEVEL_SHIFT`) becomes a stepped ramp: the floor height is
+/// linearly interpolated per horizontal step, giving a boarding-ramp/airstair
+/// look rather than a single steep slope.
 ///
-/// Stamping a full enclosing shell (not just a floor) at every step matters
-/// here specifically because the dungeon floats in open sky: an open-sided
-/// walkway would let a player step off into a very long fall down to real
-/// terrain far below instead of just off a room's edge.
+/// Unlike an earlier version of this function, each step stamps only a
+/// *cross-sectional slice* perpendicular to the direction of travel — no
+/// thickness at all along the travel axis itself. That matters specifically
+/// because the old version's travel-direction thickness became an "end cap":
+/// at the doorway end, the local map's `or_insert` wall from one step could
+/// land exactly on the world position `punch_doorway` had just opened as air,
+/// silently resealing the threshold right after opening it. With no
+/// travel-direction thickness, there is no such cap to reseal anything —
+/// each 1-block-apart slice simply tiles into the next.
+///
+/// Air still unconditionally wins over floor/wall for any given cell — kept
+/// from the earlier version — because adjacent ramp steps' interiors still
+/// overlap in world space (the ramp doesn't rise a full block every step),
+/// so a later step's floor could otherwise land inside an earlier step's
+/// headroom.
 fn carve_corridor(state: &State, from: Vec3<i32>, to: Vec3<i32>, wall: Block) {
     psypher_trace::log("corridor", json!({
         "from": vpos(from),
         "to": vpos(to),
         "width": CORRIDOR_WIDTH,
+        "headroom": CORRIDOR_HEADROOM,
     }));
 
     let diff = to - from;
-    let steps = diff.x.abs().max(diff.y.abs()).max(diff.z.abs()).max(1);
+    // One step per horizontal block travelled; height is interpolated, not
+    // stepped independently, so it never inflates the step count.
+    let steps = diff.x.abs().max(diff.y.abs()).max(1);
+    // Unit horizontal direction of travel, and the horizontal axis
+    // perpendicular to it (the width axis) — swapped x/y of `dir`.
+    let dir = Vec3::new(diff.x.signum(), diff.y.signum(), 0);
+    let perp = Vec3::new(dir.y.abs(), dir.x.abs(), 0);
     let half = CORRIDOR_WIDTH / 2;
 
-    // Accumulate into a local map first rather than calling `state.set_block`
-    // per cell immediately: for *ramped* corridors (parent/child, which climb
-    // roughly one block of height per step) consecutive steps' bounding boxes
-    // overlap enough that a later step's "floor" can land on the exact world
-    // position an earlier step just carved as walkable "air" — concretely,
-    // this silently re-sealed the doorway threshold right after opening it
-    // (confirmed via `psypher-trace` + `/osdungeon_probe`: the near end of a
-    // ramped corridor read back as solid `Rock`, not `Air`). Resolving
-    // "air always wins, regardless of which step claims a cell last" requires
-    // seeing every step's claim for a cell before committing it, hence the
-    // two-phase build-then-flush below.
     let mut cells: HashMap<Vec3<i32>, Block> = HashMap::new();
     for i in 0..=steps {
         let t = i as f32 / steps as f32;
-        let p = Vec3::new(
-            from.x as f32 + diff.x as f32 * t,
-            from.y as f32 + diff.y as f32 * t,
-            from.z as f32 + diff.z as f32 * t,
-        )
-        .map(|v| v.round() as i32);
-        // Interior spans dz 0..=1 (two blocks of headroom); dz -1 is the
-        // floor. The shell (dx/dy == ±(half+1), or dz == 2 for the ceiling)
-        // is solid `wall` — this is what stops players falling out the
-        // sides. Consecutive steps overlap enough that side walls stay
-        // continuous along the whole run; only the very end caps get walled
-        // off in the direction of travel, which is fine (that's a dead end
-        // until the doorway carve at the room end punches through it).
-        for dx in -(half + 1)..=(half + 1) {
-            for dy in -(half + 1)..=(half + 1) {
-                for dz in -1..=2 {
-                    let in_width = dx.abs() <= half && dy.abs() <= half;
-                    let pos = p + Vec3::new(dx, dy, dz);
-                    if in_width && (0..=1).contains(&dz) {
-                        // Air always wins: unconditionally overwrite whatever
-                        // any other step claimed for this cell.
-                        cells.insert(pos, Block::empty());
-                    } else {
-                        let block = if in_width && dz == -1 { floor() } else { wall };
-                        // Only claim this cell if no step has already (or
-                        // will later, from this same pass's perspective —
-                        // `insert` above always supersedes this) marked it
-                        // as air.
-                        cells.entry(pos).or_insert(block);
-                    }
+        let z = (from.z as f32 + diff.z as f32 * t).round() as i32;
+        let base = Vec3::new(from.x + dir.x * i, from.y + dir.y * i, z);
+
+        // Cross-section at this step: `w` runs across the width axis only
+        // (`perp`), `dz` is height. `|w| <= half` and `0 <= dz < HEADROOM` is
+        // the walkable interior (air, always wins); `|w| <= half, dz == -1`
+        // is the floor; everything else (the two side-wall columns at
+        // `w == ±(half+1)`, and the ceiling row `dz == HEADROOM`) is solid.
+        for w in -(half + 1)..=(half + 1) {
+            let col = base + perp * w;
+            let in_width = w.abs() <= half;
+            for dz in -1..=CORRIDOR_HEADROOM {
+                let pos = col + Vec3::new(0, 0, dz);
+                if in_width && (0..CORRIDOR_HEADROOM).contains(&dz) {
+                    cells.insert(pos, Block::empty());
+                } else if in_width && dz == -1 {
+                    cells.entry(pos).or_insert_with(floor);
+                } else {
+                    cells.entry(pos).or_insert(wall);
                 }
             }
         }
 
-        // Mark both doorway thresholds (where this corridor punches into a
-        // room) with a glowing block directly overhead — the dungeon floats
-        // in open sky with no sun of its own, so at night every wall/opening
-        // is otherwise the same near-black, and an unlit doorway is
-        // indistinguishable from a solid wall at a glance.
+        // Mark both doorway thresholds with a glowing block directly
+        // overhead — the dungeon floats in open sky with no sun of its own,
+        // so at night an unlit doorway is indistinguishable from a solid
+        // wall at a glance.
         if i == 0 || i == steps {
-            cells.insert(p + Vec3::new(0, 0, 2), door_light());
+            cells.insert(base + Vec3::new(0, 0, CORRIDOR_HEADROOM), door_light());
             psypher_trace::log("doorway", json!({
                 "end": if i == 0 { "from" } else { "to" },
-                "opening_center": vpos(p),
-                "light": vpos(p + Vec3::new(0, 0, 2)),
+                "opening_center": vpos(base),
+                "light": vpos(base + Vec3::new(0, 0, CORRIDOR_HEADROOM)),
             }));
         }
     }
@@ -690,4 +690,201 @@ pub fn probe(server: &Server, entity: specs::Entity, offset: Vec3<i32>) -> CmdRe
         "block": summary,
     }));
     Ok(format!("{summary} at anchor+{offset:?} (world {pos:?})"))
+}
+
+/// Automated checks for `render_layout`'s doorway/corridor connectivity —
+/// added after several rounds of a human having to walk into a room in a
+/// live game, get stuck, and report back "the hole isn't open" before any
+/// specific bug could be pinned down. This constructs a bare `State` (no
+/// server, no network, no game client — see `common/systems/tests/` for the
+/// same pattern used elsewhere in the codebase) and asserts on the *actual*
+/// terrain left behind after `render_layout` + a real `BlockChange` flush,
+/// not just on what the code *intended* to write.
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use common::{
+        resources::GameMode,
+        shared_server_config::ServerConstants,
+        terrain::{MapSizeLg, TerrainChunk},
+    };
+    use std::{sync::Arc, time::Duration};
+    use vek::Vec2;
+
+    /// A bare `State` with a generous grid of empty (air-above-sea-level)
+    /// chunks pre-loaded around the origin — big enough to cover any
+    /// position `render_layout` could plausibly write to for the anchor used
+    /// below, without needing full world generation.
+    fn setup() -> State {
+        let pools = State::pools(GameMode::Server);
+        let map_size_lg = MapSizeLg::new(Vec2::new(1, 1)).unwrap();
+        let mut state = State::new(
+            GameMode::Server,
+            pools,
+            map_size_lg,
+            Arc::new(TerrainChunk::water(0)),
+            |_dispatch_builder| {},
+            #[cfg(feature = "plugins")]
+            common_state::plugin::PluginMgr::default(),
+        );
+        // ±6 chunks (32 blocks each) covers ±192 in x/y, comfortably beyond
+        // `layout_bounds`' current reach.
+        for cx in -6..=6 {
+            for cy in -6..=6 {
+                state.insert_chunk(Vec2::new(cx, cy), Arc::new(TerrainChunk::water(0)));
+            }
+        }
+        state
+    }
+
+    /// Flush queued `BlockChange` writes into real terrain, the same way a
+    /// live server does once per tick — `render_layout`'s `set_block` calls
+    /// only *queue* edits (see `probe`'s own doc comment above) until this
+    /// runs, which is exactly the subtlety that made earlier bugs here hard
+    /// to reason about from source alone.
+    fn flush(state: &mut State) {
+        state.tick(
+            Duration::from_millis(1),
+            true,
+            None,
+            &ServerConstants { day_cycle_coefficient: 24.0 },
+            |_, _| {},
+        );
+    }
+
+    /// A real directory with both a parent *and* several children, so the
+    /// test exercises the same window-computation `render_layout` uses in
+    /// production. `server/`'s parent (the repo root) qualifies.
+    fn test_path() -> PathBuf {
+        std::env::current_dir().unwrap().parent().unwrap().to_path_buf()
+    }
+
+    fn block_kind_at(state: &State, pos: Vec3<i32>) -> Option<BlockKind> {
+        state.get_block(pos).map(|b| b.kind())
+    }
+
+    #[test]
+    fn parent_doorway_is_walkable_at_both_ends() {
+        let mut state = setup();
+        let anchor = Vec3::new(0, 0, 500);
+        let path = test_path();
+        assert!(path.parent().is_some(), "test needs a path with a parent");
+
+        clear_layout(&state, anchor);
+        render_layout(&state, anchor, &path);
+        flush(&mut state);
+
+        // Current room's side of the parent doorway, and a couple of steps
+        // further out along the *ramp's own interpolated path* (not at a
+        // fixed height — this link climbs as it goes, so "2 blocks forward
+        // at the doorway's height" is partway into the floor by design, not
+        // a bug; see `corridor_interior_is_walkable_partway_along_the_ramp`
+        // below for a midpoint check done the correct way) — both must be
+        // open, not the room's own solid wall or a resealed "end cap".
+        let near_door = anchor + Vec3::new(-ROOM_HALF.x, 0, DOOR_Z);
+        let past_door = anchor + Vec3::new(-ROOM_HALF.x - 2, 0, DOOR_Z + 1);
+        assert_eq!(
+            block_kind_at(&state, near_door),
+            Some(BlockKind::Air),
+            "current room's doorway threshold toward its parent must be open"
+        );
+        assert_eq!(
+            block_kind_at(&state, past_door),
+            Some(BlockKind::Air),
+            "just past the doorway threshold must still be open, not resealed"
+        );
+
+        // The parent room's own doorway, facing back — the far end of the
+        // ramp, where the original "later step's floor reseals the earlier
+        // step's air" bug specifically showed up.
+        let parent_center =
+            anchor + Vec3::new(-(ROOM_HALF.x * 2 + CORRIDOR_LEN), 0, LEVEL_SHIFT);
+        let parent_door = parent_center + Vec3::new(ROOM_HALF.x, 0, DOOR_Z);
+        assert_eq!(
+            block_kind_at(&state, parent_door),
+            Some(BlockKind::Air),
+            "parent room's doorway threshold toward the current room must be open"
+        );
+
+        // Sanity check: a spot on the same wall, away from the doorway
+        // width, must still be solid — otherwise these assertions would
+        // trivially pass because *nothing* is solid (e.g. a broken
+        // `clear_layout` that never got redrawn).
+        let away_from_door = anchor + Vec3::new(-ROOM_HALF.x, ROOM_HALF.y - 2, 0);
+        assert_eq!(
+            block_kind_at(&state, away_from_door),
+            Some(BlockKind::Rock),
+            "the room's wall away from any doorway must remain solid"
+        );
+    }
+
+    #[test]
+    fn first_child_doorway_is_walkable_at_both_ends() {
+        let mut state = setup();
+        let anchor = Vec3::new(0, 0, 500);
+        let path = test_path();
+        let (total_children, _) = children_window(&path, 0, WINDOW_RADIUS);
+        assert!(total_children > 0, "test needs a path with at least one child directory");
+
+        clear_layout(&state, anchor);
+        render_layout(&state, anchor, &path);
+        flush(&mut state);
+
+        let near_door = anchor + Vec3::new(ROOM_HALF.x, 0, DOOR_Z);
+        assert_eq!(
+            block_kind_at(&state, near_door),
+            Some(BlockKind::Air),
+            "current room's doorway threshold toward child[0] must be open"
+        );
+
+        let child_center =
+            anchor + Vec3::new(ROOM_HALF.x * 2 + CORRIDOR_LEN, 0, -LEVEL_SHIFT);
+        let child_door = child_center + Vec3::new(-ROOM_HALF.x, 0, DOOR_Z);
+        assert_eq!(
+            block_kind_at(&state, child_door),
+            Some(BlockKind::Air),
+            "child[0]'s doorway threshold toward the current room must be open"
+        );
+    }
+
+    #[test]
+    fn corridor_interior_is_walkable_partway_along_the_ramp() {
+        // Specifically exercises the middle of a ramped link, not just its
+        // two ends — this is where the "end cap" bug in an earlier version
+        // did *not* show up (only the doorway thresholds did), so it's worth
+        // covering separately.
+        let mut state = setup();
+        let anchor = Vec3::new(0, 0, 500);
+        let path = test_path();
+
+        clear_layout(&state, anchor);
+        render_layout(&state, anchor, &path);
+        flush(&mut state);
+
+        let from = anchor + Vec3::new(-ROOM_HALF.x, 0, DOOR_Z);
+        let parent_center =
+            anchor + Vec3::new(-(ROOM_HALF.x * 2 + CORRIDOR_LEN), 0, LEVEL_SHIFT);
+        let to = parent_center + Vec3::new(ROOM_HALF.x, 0, DOOR_Z);
+        let mid = Vec3::new((from.x + to.x) / 2, from.y, (from.z + to.z) / 2);
+        assert_eq!(
+            block_kind_at(&state, mid),
+            Some(BlockKind::Air),
+            "the middle of the ramp must be walkable, not just its two doorway ends"
+        );
+    }
+
+    #[test]
+    fn spawn_position_is_within_every_doorway_height_band() {
+        // The height used to teleport the player in (see `enter`'s
+        // `spawn`) must fall inside the vertical range every doorway opens
+        // (`DOOR_Z ..= DOOR_Z + DOOR_HEIGHT - 1`), or a player standing at
+        // spawn height — before/without falling to the floor — would have
+        // their head above every doorway's ceiling.
+        let spawn_z_offset = DOOR_Z + 2;
+        assert!(
+            (DOOR_Z..DOOR_Z + DOOR_HEIGHT).contains(&spawn_z_offset),
+            "spawn height {spawn_z_offset} must be within the doorway band {DOOR_Z}..{}",
+            DOOR_Z + DOOR_HEIGHT
+        );
+    }
 }

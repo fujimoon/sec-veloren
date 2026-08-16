@@ -21,12 +21,17 @@ use std::{
 use serde::Serialize;
 use serde_json::{Value, json};
 
-/// Where the trace file lives, relative to the server process's working
-/// directory (which, for `cargo run`/singleplayer, is the repo root — see
-/// `psypher/docs/*/specs/OsDungeon.md`). Co-located with this crate's source
-/// so it's easy to find; this is a dev-only debugging aid, not shipped
-/// player data, so it deliberately doesn't go under `userdata/`.
-const TRACE_FILE: &str = "psypher/trace/dungeon_trace.jsonl";
+/// Where the trace file lives — an absolute path anchored to *this crate's*
+/// own source directory (via `CARGO_MANIFEST_DIR`, resolved once at compile
+/// time on whatever machine builds it), not a path relative to the calling
+/// process's current working directory. That distinction matters: a caller
+/// running under `cargo test` (cwd = that test's own crate directory, e.g.
+/// `server/`) or launched from some other location entirely would otherwise
+/// each recreate their own stray `psypher/trace/` next to wherever they
+/// happened to run from, rather than all writing to this one real file. This
+/// is a dev-only debugging aid, not shipped player data, so it deliberately
+/// doesn't go under `userdata/` either.
+const TRACE_FILE: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/dungeon_trace.jsonl");
 
 static SEQ: AtomicU64 = AtomicU64::new(0);
 static LOCK: Mutex<()> = Mutex::new(());

@@ -26,7 +26,7 @@ psypher_trace::log("room", serde_json::json!({
 }));
 ```
 
-Output goes to `psypher/trace/dungeon_trace.jsonl` (a path relative to the server process's working directory), one JSON object per line. Each line carries a monotonically increasing `seq` (in call order) and the `kind` given at the call site (the event type, e.g. `"room"`, `"corridor"`, `"doorway"`, `"probe"`), plus whatever other fields were passed in, flattened into the same object.
+Output goes to `psypher/trace/dungeon_trace.jsonl` (an absolute path anchored to this crate's own source directory — see "3. Architecture"), one JSON object per line. Each line carries a monotonically increasing `seq` (in call order) and the `kind` given at the call site (the event type, e.g. `"room"`, `"corridor"`, `"doorway"`, `"probe"`), plus whatever other fields were passed in, flattened into the same object.
 
 No game client is needed to read it — a text editor, `jq`, or another agent/script can read it directly. [OS Dungeon](OsDungeon.md) uses this to record the coordinates of every room/corridor/doorway it generates, plus the actual terrain block kind read back by the `/osdungeon_probe` command — which is how its corridor bug and teleport-ordering bug were pinned down without any screenshot exchange.
 
@@ -45,6 +45,11 @@ psypher-trace (standalone crate, psypher/trace/)
 - Each line's `seq` is a process-global monotonic counter (`AtomicU64`), deliberately *not* a wall-clock timestamp — so call ordering is always reproducible correctly even in execution environments where reading the real clock is unavailable or undesirable.
 - A write failure (missing directory, no permission, etc.) is silently swallowed rather than propagated — a debugging aid must never break the feature it's debugging.
 - Both `clear()` and `log()` re-ensure the directory/file exist on every call via `OpenOptions::create(true)`.
+- The output path (`TRACE_FILE`) is `concat!(env!("CARGO_MANIFEST_DIR"), "/dungeon_trace.jsonl")` — an absolute path to this crate's own `Cargo.toml` directory, resolved once at build time. It does not depend on the calling process's runtime working directory at all.
+
+### Fix history: the working-directory-dependent version
+
+`TRACE_FILE` originally held a relative path, `"psypher/trace/dungeon_trace.jsonl"`. That worked fine for `cargo run` launched from the repo root, but calling it from `cargo test -p veloren-server` (whose working directory is `server/`) instead created a stray, duplicate `server/psypher/trace/dungeon_trace.jsonl`. This surfaced once OS Dungeon's own automated tests started calling into it, and was fixed by switching to the `CARGO_MANIFEST_DIR`-anchored absolute path above.
 
 ## 4. Files changed
 
@@ -60,9 +65,9 @@ Consumers:
 ## 5. Known limitations
 
 - Always-on debugging mechanism; there's no feature flag yet to exclude it from a distributed build (the same gap noted for its consumer, [OS Dungeon](OsDungeon.md)).
-- The output path is a fixed path relative to the server process's working directory (`psypher/trace/dungeon_trace.jsonl`). If the process is launched from an unexpected working directory, the file lands somewhere unexpected too.
 - No file-size cap or rotation — it keeps growing until a caller calls `clear()`.
 - No unit tests (neither the happy path nor file-I/O-failure behavior of `clear`/`log` is covered by any test).
+- The output location (`psypher/trace/dungeon_trace.jsonl`) is fixed at build time as an absolute path (see the fix history above), so this ever-changing debug output still lands inside the source tree. It's excluded from git (`.gitignore`) already, but moving it outside the repo entirely (e.g. a temp directory) is worth considering.
 
 ## 6. Security posture
 

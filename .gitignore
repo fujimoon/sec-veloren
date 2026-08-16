@@ -101,3 +101,6 @@ perf.*
 
 ## wgpu with the "trace" feature enabled
 wgpu-trace/
+
+## psypher-trace debug output (runtime debug aid, not source — see psypher/docs/*/specs/Tracer.md)
+psypher/trace/dungeon_trace.jsonl
