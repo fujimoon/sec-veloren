@@ -418,6 +418,8 @@ pub enum ServerChatCommand {
     Motd,
     Mount,
     Object,
+    OsDungeon,
+    OsDungeonProbe,
     Outcome,
     PermitBuild,
     Players,
@@ -834,6 +836,20 @@ impl ServerChatCommand {
                 Content::localized("command-object-desc"),
                 Some(Admin),
             ),
+            ServerChatCommand::OsDungeon => cmd(
+                vec![Message(Optional)],
+                Content::localized("command-osdungeon-desc"),
+                Some(Moderator),
+            ),
+            ServerChatCommand::OsDungeonProbe => cmd(
+                vec![
+                    Integer("dx", 0, Required),
+                    Integer("dy", 0, Required),
+                    Integer("dz", -5, Required),
+                ],
+                Content::localized("command-osdungeon_probe-desc"),
+                Some(Moderator),
+            ),
             ServerChatCommand::Outcome => cmd(
                 vec![Enum("outcome", OUTCOME_KINDS.clone(), Required)],
                 Content::localized("command-outcome-desc"),
@@ -1216,6 +1232,8 @@ impl ServerChatCommand {
             ServerChatCommand::MakeSprite => "make_sprite",
             ServerChatCommand::Motd => "motd",
             ServerChatCommand::Object => "object",
+            ServerChatCommand::OsDungeon => "osdungeon",
+            ServerChatCommand::OsDungeonProbe => "osdungeon_probe",
             ServerChatCommand::Outcome => "outcome",
             ServerChatCommand::PermitBuild => "permit_build",
             ServerChatCommand::Players => "players",

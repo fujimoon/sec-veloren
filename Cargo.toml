@@ -25,6 +25,9 @@ members = [
     "voxygen/egui",
     "voxygen/i18n-helpers",
     "world",
+    "psypher/os_dungeon/cli",
+    "psypher/os_dungeon/game",
+    "psypher/trace",
 ]
 
 ### PACKAGE ###

@@ -1,0 +1,11 @@
+[package]
+name = "psypher-os-dungeon-game"
+version = "0.1.0"
+edition = "2024"
+license = "GPL-3.0-or-later"
+description = "Pure filesystem-to-dungeon-layout logic shared by the psy CLI and the in-game OS Dungeon feature. No Veloren or shell dependency."
+
+[dependencies]
+
+[dev-dependencies]
+tempfile = "3"

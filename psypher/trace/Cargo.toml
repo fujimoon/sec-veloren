@@ -1,0 +1,10 @@
+[package]
+name = "psypher-trace"
+version = "0.1.0"
+edition = "2024"
+license = "GPL-3.0-or-later"
+description = "Always-on structured trace logger for debugging server-generated geometry (e.g. the OS Dungeon) from outside the running game, without needing screenshots."
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"

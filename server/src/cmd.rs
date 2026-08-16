@@ -194,6 +194,8 @@ fn do_command(
         ServerChatCommand::MakeSprite => handle_make_sprite,
         ServerChatCommand::Motd => handle_motd,
         ServerChatCommand::Object => handle_object,
+        ServerChatCommand::OsDungeon => handle_os_dungeon,
+        ServerChatCommand::OsDungeonProbe => handle_os_dungeon_probe,
         ServerChatCommand::Outcome => handle_outcome,
         ServerChatCommand::PermitBuild => handle_permit_build,
         ServerChatCommand::Players => handle_players,
@@ -3414,6 +3416,76 @@ fn handle_object(
     } else {
         Err(Content::Plain("Object not found!".into()))
     }
+}
+
+/// Toggle the OS Dungeon: enter (drawing the layout for the given path, or
+/// the server's working directory if none given) if the invoking player
+/// doesn't currently have a session, otherwise exit it. See
+/// `crate::os_dungeon` for the actual geometry/session logic.
+fn handle_os_dungeon(
+    server: &mut Server,
+    client: EcsEntity,
+    target: EcsEntity,
+    args: Vec<String>,
+    _action: &ServerChatCommand,
+) -> CmdResult<()> {
+    let target_uid = server.state.ecs().read_storage::<Uid>().get(target).copied();
+    let already_in = target_uid
+        .map(|uid| {
+            server
+                .state
+                .ecs()
+                .read_resource::<crate::os_dungeon::OsDungeonSessions>()
+                .contains(uid)
+        })
+        .unwrap_or(false);
+
+    if already_in {
+        crate::os_dungeon::exit(server, target)?;
+        server.notify_client(
+            client,
+            ServerGeneral::server_msg(
+                ChatType::CommandInfo,
+                Content::Plain("Left the OS Dungeon.".to_owned()),
+            ),
+        );
+    } else {
+        let path_arg = if args.is_empty() { None } else { Some(args.join(" ")) };
+        crate::os_dungeon::enter(server, target, path_arg)?;
+        server.notify_client(
+            client,
+            ServerGeneral::server_msg(
+                ChatType::CommandInfo,
+                Content::Plain(
+                    "Entered the OS Dungeon. Send /osdungeon again (or walk back through the \
+                     parent doorway) to leave."
+                        .to_owned(),
+                ),
+            ),
+        );
+    }
+    Ok(())
+}
+
+/// Debug tool: report the real (not just intended) terrain at
+/// `anchor + (dx, dy, dz)` inside the caller's active OS Dungeon session, and
+/// append it to the `psypher/trace` log. See `crate::os_dungeon::probe`.
+fn handle_os_dungeon_probe(
+    server: &mut Server,
+    client: EcsEntity,
+    target: EcsEntity,
+    args: Vec<String>,
+    action: &ServerChatCommand,
+) -> CmdResult<()> {
+    let (Some(dx), Some(dy), Some(dz)) = parse_cmd_args!(args, i32, i32, i32) else {
+        return Err(action.help_content());
+    };
+    let report = crate::os_dungeon::probe(server, target, Vec3::new(dx, dy, dz))?;
+    server.notify_client(
+        client,
+        ServerGeneral::server_msg(ChatType::CommandInfo, Content::Plain(report)),
+    );
+    Ok(())
 }
 
 fn handle_outcome(

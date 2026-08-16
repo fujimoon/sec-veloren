@@ -6040,12 +6040,35 @@ dependencies = [
 ]
 
 [[package]]
+name = "psy"
+version = "0.1.0"
+dependencies = [
+ "crossterm",
+ "psypher-os-dungeon-game",
+]
+
+[[package]]
+name = "psypher-os-dungeon-game"
+version = "0.1.0"
+dependencies = [
+ "tempfile",
+]
+
+[[package]]
 name = "psypher-terminal"
 version = "0.1.0"
 dependencies = [
  "alacritty_terminal",
  "egui",
  "tracing",
+]
+
+[[package]]
+name = "psypher-trace"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
@@ -9018,6 +9041,8 @@ dependencies = [
  "parking_lot",
  "portpicker",
  "prometheus",
+ "psypher-os-dungeon-game",
+ "psypher-trace",
  "quinn",
  "rand 0.10.1",
  "rayon",

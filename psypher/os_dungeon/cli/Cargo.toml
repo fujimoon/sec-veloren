@@ -1,0 +1,14 @@
+[package]
+name = "psy"
+version = "0.1.0"
+edition = "2024"
+license = "GPL-3.0-or-later"
+description = "Psypher CLI toolset – filesystem dungeon explorer and more"
+
+[[bin]]
+name = "psy"
+path = "src/main.rs"
+
+[dependencies]
+crossterm = "0.29"
+psypher-os-dungeon-game = { path = "../game" }

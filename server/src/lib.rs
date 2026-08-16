@@ -22,6 +22,11 @@ pub mod location;
 pub mod lod;
 pub mod login_provider;
 pub mod metrics;
+// Physically relocated under psypher/ (organizational only — this module
+// still compiles as part of the `server` crate and depends on `Server`/
+// `StateExt` as before; see psypher/server/src/os_dungeon/os_dungeon.rs).
+#[path = "../../psypher/server/src/os_dungeon/os_dungeon.rs"]
+pub mod os_dungeon;
 pub mod persistence;
 mod pet;
 pub mod presence;
@@ -378,6 +383,9 @@ impl Server {
             .ecs_mut()
             .insert(EventBus::<chunk_serialize::ChunkSendEntry>::default());
         state.ecs_mut().insert(Locations::default());
+        state
+            .ecs_mut()
+            .insert(os_dungeon::OsDungeonSessions::default());
         state.ecs_mut().insert(LoginProvider::new(
             settings.auth_server_address.clone(),
             Arc::clone(&runtime),
